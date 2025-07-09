@@ -7,7 +7,7 @@
      JWT_SECRET=supersecretkey
      
 3.Run the sever
-->node index.js
+->nodemon index
 
 4.Backend runs at 
 ->http://localhost:5000/api
