@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Simple E‑commerce API Tester</title>
+  <style>
+    :root { --accent:#4f46e5; --bg:#f5f5f5; }
+    *{box-sizing:border-box;font-family:Arial,Helvetica,sans-serif}
+    body{margin:0;background:var(--bg);color:#222}
+    header{background:var(--accent);color:#fff;padding:1rem;text-align:center}
+    main{padding:1rem;max-width:900px;margin:auto}
+    h2{margin-top:2rem;border-bottom:2px solid var(--accent);padding-bottom:.25rem}
+    form{display:grid;gap:.5rem;margin-bottom:1rem;background:#fff;padding:1rem;border-radius:.5rem;box-shadow:0 2px 4px rgba(0,0,0,.05)}
+    label{display:flex;flex-direction:column;font-size:.9rem}
+    input,select,button{padding:.5rem;border:1px solid #ccc;border-radius:.3rem;font-size:1rem}
+    button{cursor:pointer;background:var(--accent);color:#fff;border:none}
+    table{width:100%;border-collapse:collapse;margin-top:.5rem}
+    th,td{border:1px solid #ddd;padding:.5rem;text-align:left}
+    th{background:#eee}
+  </style>
+</head>
+<body>
+<header><h1>🛍️ Simple E‑commerce API Tester</h1></header>
+<main>
+  <!-- 0. BACKEND URL -->
+  <section id="config">
+    <h2>0️⃣ Backend URL</h2>
+    <form id="baseForm">
+      <label>API Base URL (ends with <code>/api</code>)
+        <input id="baseInput" placeholder="http://localhost:5000/api" />
+      </label>
+      <button>Save URL</button>
+    </form>
+  </section>
+
+  <!-- 1. REGISTER / 2. LOGIN -->
+  <section id="auth">
+    <h2>1️⃣ Register</h2>
+    <form id="registerForm">
+      <label>Name <input required id="regName"/></label>
+      <label>Email <input required type="email" id="regEmail"/></label>
+      <label>Password <input required type="password" id="regPw"/></label>
+      <label>Role <select id="regRole"><option value="customer">customer</option><option value="admin">admin</option></select></label>
+      <button>Register</button>
+    </form>
+
+    <h2>2️⃣ Login</h2>
+    <form id="loginForm">
+      <label>Email <input required type="email" id="logEmail"/></label>
+      <label>Password <input required type="password" id="logPw"/></label>
+      <button>Login</button>
+    </form>
+  </section>
+
+  <!-- 3. PRODUCTS -->
+  <section id="products">
+    <h2>3️⃣ Products</h2>
+    <button id="btnFetch">Fetch Products</button>
+    <table id="prodTable"></table>
+
+    <h3>Add Product (admin)</h3>
+    <form id="addProdForm">
+      <label>Name <input required id="prodName"/></label>
+      <label>Description <input id="prodDesc"/></label>
+      <label>Category <input id="prodCat"/></label>
+      <label>Price <input required type="number" step="0.01" id="prodPrice"/></label>
+      <label>Stock <input required type="number" id="prodStock"/></label>
+      <button>Add Product</button>
+    </form>
+  </section>
+
+  <!-- 4. CART -->
+  <section id="cart">
+    <h2>4️⃣ Cart</h2>
+    <button id="btnCart">View Cart</button>
+    <table id="cartTable"></table>
+
+    <h3>Add Item to Cart</h3>
+    <form id="cartAddForm">
+      <label>Product ID <input required id="cartProdId"/></label>
+      <label>Qty <input required type="number" min="1" id="cartQty" value="1"/></label>
+      <button>Add / Update</button>
+    </form>
+
+    <h3>Remove Item</h3>
+    <form id="cartRemoveForm">
+      <label>Product ID <input required id="cartRemId"/></label>
+      <button>Remove</button>
+    </form>
+  </section>
+
+  <!-- 5. ORDERS -->
+  <section id="orders">
+    <h2>5️⃣ Orders</h2>
+    <button id="btnPlaceOrder">Place Order (from Cart)</button>
+    <button id="btnMyOrders">My Orders</button>
+    <table id="orderTable"></table>
+  </section>
+</main>
+
+<script>
+/***** CONFIG *****/
+let BASE = localStorage.getItem('baseUrl') || 'http://localhost:5000/api';
+document.getElementById('baseInput').value = BASE;
+baseForm.addEventListener('submit',e=>{e.preventDefault();BASE=baseInput.value.trim().replace(/\/$/,'');localStorage.setItem('baseUrl',BASE);alert('✅ Base URL saved');});
+
+/***** STATE & HELPERS *****/
+let token = localStorage.getItem('jwt')||'';
+const headers = ()=> token?{Authorization:`Bearer ${token}`,'Content-Type':'application/json'}:{'Content-Type':'application/json'};
+const fmtErr = async r=>`${r.status} – ${await r.text()}`;
+
+/***** AUTH *****/
+registerForm.addEventListener('submit',async e=>{e.preventDefault();
+  const body={name:regName.value,email:regEmail.value,password:regPw.value,role:regRole.value};
+  const r=await fetch(`${BASE}/auth/register`,{method:'POST',headers:headers(),body:JSON.stringify(body)});
+  alert(r.ok?'✅ Registered':'❌ '+await fmtErr(r));});
+
+loginForm.addEventListener('submit',async e=>{e.preventDefault();
+  const body={email:logEmail.value,password:logPw.value};
+  const r=await fetch(`${BASE}/auth/login`,{method:'POST',headers:headers(),body:JSON.stringify(body)});
+  const d=await r.json();
+  if(d.token){token=d.token;localStorage.setItem('jwt',token);alert('✅ Logged in');}
+  else alert('❌ '+(d.msg||'Login failed'));});
+
+/***** PRODUCTS *****/
+btnFetch.onclick=async()=>{const r=await fetch(`${BASE}/products`);if(!r.ok)return alert('❌ '+await fmtErr(r));
+  const {products}=await r.json();
+  if(!products.length)alert('ℹ️ No products yet');
+  prodTable.innerHTML='<tr><th>_id</th><th>Name</th><th>Price</th><th>Stock</th></tr>'+products.map(p=>`<tr><td>${p._id}</td><td>${p.name}</td><td>${p.price}</td><td>${p.stock}</td></tr>`).join('');};
+
+addProdForm.addEventListener('submit',async e=>{e.preventDefault();
+  const body={name:prodName.value,description:prodDesc.value,category:prodCat.value,price:+prodPrice.value,stock:+prodStock.value};
+  const r=await fetch(`${BASE}/products`,{method:'POST',headers:headers(),body:JSON.stringify(body)});
+  if(r.ok){alert('✅ Product added');addProdForm.reset();btnFetch.click();}
+  else alert('❌ '+await fmtErr(r));});
+
+/***** CART *****/
+btnCart.onclick=async()=>{const r=await fetch(`${BASE}/cart`,{headers:headers()});if(!r.ok)return alert('❌ '+await fmtErr(r));
+  const items=await r.json();
+  if(!items.length)alert('ℹ️ Cart empty');
+  cartTable.innerHTML='<tr><th>Product</th><th>Qty</th></tr>'+items.map(i=>`<tr><td>${i.product?.name||i.product}</td><td>${i.qty}</td></tr>`).join('');};
+
+cartAddForm.addEventListener('submit',async e=>{e.preventDefault();
+  const body={productId:cartProdId.value,qty:+cartQty.value};
+  const r=await fetch(`${BASE}/cart/add`,{method:'POST',headers:headers(),body:JSON.stringify(body)});
+  if(r.ok){alert('✅ Cart updated');cartAddForm.reset();btnCart.click();}
+  else alert('❌ '+await fmtErr(r));});
+
+cartRemoveForm.addEventListener('submit',async e=>{e.preventDefault();
+  const body={productId:cartRemId.value};
+  const r=await fetch(`${BASE}/cart/remove`,{method:'POST',headers:headers(),body:JSON.stringify(body)});
+  if(r.ok){alert('✅ Item removed');cartRemoveForm.reset();btnCart.click();}
+  else alert('❌ '+await fmtErr(r));});
+
+/***** ORDERS *****/
+btnPlaceOrder.onclick=async()=>{const r=await fetch(`${BASE}/orders`,{method:'POST',headers:headers()});alert(r.ok?'✅ Order placed':'❌ '+await fmtErr(r));};
+
+btnMyOrders.onclick=async()=>{const r=await fetch(`${BASE}/orders`,{headers:headers()});if(!r.ok)return alert('❌ '+await fmtErr(r));
+  const orders=await r.json();
+  if(!orders.length)alert('ℹ️ No orders yet');
+  orderTable.innerHTML='<tr><th>Order ID</th><th>Total</th><th>Items</th></tr>'+orders.map(o=>`<tr><td>${o._id}</td><td>${o.total}</td><td>${o.items.map(i=>i.qty+' x '+(i.product?.name||'')).join(', ')}</td></tr>`).join('');};
+</script>
+</body>
+</html>
